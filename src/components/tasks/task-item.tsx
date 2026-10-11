@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { motion, useAnimation, type PanInfo } from "framer-motion";
+import { motion, useMotionValue, useTransform, animate, type PanInfo } from "framer-motion";
 import { Check, Trash2, Circle, CheckCircle2, XCircle, MoreVertical } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
@@ -25,7 +25,11 @@ const SWIPE_THRESHOLD = 72;
 export function TaskItem({ task }: { task: Task }) {
   const { updateTask, deleteTask, stopRunningTask } = useTasksContext();
   const { categories } = useCategoriesContext();
-  const controls = useAnimation();
+  const x = useMotionValue(0);
+  // Hint text is fully transparent at rest and only fades in as you drag
+  // toward the threshold, so it can never show up (or misrender) at rest.
+  const doneOpacity = useTransform(x, [0, SWIPE_THRESHOLD], [0, 1]);
+  const deleteOpacity = useTransform(x, [-SWIPE_THRESHOLD, 0], [1, 0]);
   const [dragging, setDragging] = useState(false);
   const now = useNow();
 
@@ -70,13 +74,13 @@ export function TaskItem({ task }: { task: Task }) {
   function handleDragEnd(_: unknown, info: PanInfo) {
     setDragging(false);
     if (info.offset.x > SWIPE_THRESHOLD) {
-      controls.start({ x: 0 });
+      animate(x, 0);
       markDone();
     } else if (info.offset.x < -SWIPE_THRESHOLD) {
-      controls.start({ x: "-100%", opacity: 0, transition: { duration: 0.15 } });
+      animate(x, -400, { duration: 0.15 });
       remove();
     } else {
-      controls.start({ x: 0 });
+      animate(x, 0);
     }
   }
 
@@ -99,25 +103,26 @@ export function TaskItem({ task }: { task: Task }) {
 
   return (
     <div className="relative overflow-hidden rounded-xl">
-      {/* Swipe-reveal background actions (mobile) */}
-      <div className="absolute inset-0 flex items-center justify-between px-5 md:hidden">
-        <div className="flex items-center gap-1.5 text-emerald-600">
+      {/* Swipe-reveal background actions (mobile) — invisible at rest, fades
+          in only as you actually drag, so it can never show up unprompted. */}
+      <div className="pointer-events-none absolute inset-0 flex items-center justify-between px-5 md:hidden">
+        <motion.div style={{ opacity: doneOpacity }} className="flex items-center gap-1.5 text-emerald-600">
           <Check className="size-5" />
           <span className="text-sm font-medium">Done</span>
-        </div>
-        <div className="flex items-center gap-1.5 text-destructive">
+        </motion.div>
+        <motion.div style={{ opacity: deleteOpacity }} className="flex items-center gap-1.5 text-destructive">
           <span className="text-sm font-medium">Delete</span>
           <Trash2 className="size-5" />
-        </div>
+        </motion.div>
       </div>
 
       <motion.div
         drag="x"
         dragConstraints={{ left: 0, right: 0 }}
         dragElastic={0.6}
+        style={{ x }}
         onDragStart={() => setDragging(true)}
         onDragEnd={handleDragEnd}
-        animate={controls}
         className={cn(
           "relative flex items-center gap-3 rounded-xl border bg-card px-3 py-3 md:cursor-default",
           task.status === "done" && "opacity-70",
