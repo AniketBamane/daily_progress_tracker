@@ -2,8 +2,9 @@ import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
   /* config options here */
-  cacheComponents: true,
-  partialPrefetching: true,
+  // This app is fully authenticated and reads cookies/user data on every
+  // route, so there's nothing to statically prerender — Cache Components
+  // (Next 16's opt-in PPR successor) would just add friction here.
   turbopack: {
     rules: {
       "*.css": {
