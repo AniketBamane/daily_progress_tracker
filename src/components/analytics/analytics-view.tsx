@@ -9,6 +9,7 @@ import { TrendBarChart, type TrendPoint } from "@/components/analytics/trend-bar
 import { CategoryDonut } from "@/components/analytics/category-donut";
 import { ActivityHeatmap } from "@/components/analytics/activity-heatmap";
 import { useCategoriesContext } from "@/contexts/categories-context";
+import { useNow } from "@/hooks/use-now";
 import {
   buildCategoryTotals,
   buildDailyTotals,
@@ -32,7 +33,7 @@ export function AnalyticsView({ tasks }: { tasks: Task[] }) {
   const [period, setPeriod] = useState<Period>("week");
   const { categories } = useCategoriesContext();
 
-  const now = useMemo(() => new Date(), []);
+  const now = useNow();
 
   const periodData = useMemo(() => {
     const dayMs = 86400000;
@@ -45,10 +46,10 @@ export function AnalyticsView({ tasks }: { tasks: Task[] }) {
     const currentTasks = rangeTasks(tasks, start, end);
     const previous = rangeTasks(tasks, prevStart, start);
 
-    const currentTotal = currentTasks.reduce((sum, t) => sum + taskSeconds(t), 0);
-    const previousTotal = previous.reduce((sum, t) => sum + taskSeconds(t), 0);
+    const currentTotal = currentTasks.reduce((sum, t) => sum + taskSeconds(t, now), 0);
+    const previousTotal = previous.reduce((sum, t) => sum + taskSeconds(t, now), 0);
 
-    const dailyTotals = buildDailyTotals(currentTasks);
+    const dailyTotals = buildDailyTotals(currentTasks, now);
 
     let trend: TrendPoint[];
     if (period === "year") {
@@ -62,7 +63,7 @@ export function AnalyticsView({ tasks }: { tasks: Task[] }) {
             const d = new Date(t.start_time);
             return d.getFullYear() === m.year && d.getMonth() === m.month;
           })
-          .reduce((sum, t) => sum + taskSeconds(t), 0);
+          .reduce((sum, t) => sum + taskSeconds(t, now), 0);
         return { label: m.label, seconds };
       });
     } else {
@@ -96,16 +97,16 @@ export function AnalyticsView({ tasks }: { tasks: Task[] }) {
   }, [tasks, period, now]);
 
   const categoryTotals = useMemo(
-    () => buildCategoryTotals(periodData.periodTasks, categories),
-    [periodData, categories]
+    () => buildCategoryTotals(periodData.periodTasks, categories, now),
+    [periodData, categories, now]
   );
 
   const bestWeekday = useMemo(() => {
-    const averages = weekdayAverages(tasks);
+    const averages = weekdayAverages(tasks, now);
     return averages.reduce((best, w) => (w.avgSeconds > best.avgSeconds ? w : best), averages[0]);
-  }, [tasks]);
+  }, [tasks, now]);
 
-  const yearlyTotals = useMemo(() => buildDailyTotals(tasks), [tasks]);
+  const yearlyTotals = useMemo(() => buildDailyTotals(tasks, now), [tasks, now]);
 
   const insight = useMemo(() => {
     if (periodData.change === null || periodData.currentTotal === 0) {

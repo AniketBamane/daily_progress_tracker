@@ -14,7 +14,9 @@ import {
 import { useTasksContext } from "@/contexts/tasks-context";
 import { useCategoriesContext } from "@/contexts/categories-context";
 import { createClient } from "@/lib/supabase/client";
-import { formatClockTime, formatDuration, elapsedSeconds } from "@/lib/utils/time";
+import { useNow } from "@/hooks/use-now";
+import { formatClockTime, formatDuration } from "@/lib/utils/time";
+import { getTaskPhase, taskSeconds } from "@/lib/utils/analytics";
 import type { Task } from "@/types/database";
 import { cn } from "@/lib/utils";
 
@@ -25,16 +27,11 @@ export function TaskItem({ task }: { task: Task }) {
   const { categories } = useCategoriesContext();
   const controls = useAnimation();
   const [dragging, setDragging] = useState(false);
+  const now = useNow();
 
   const category = categories.find((c) => c.id === task.category_id) ?? null;
-
-  const duration =
-    task.duration_seconds ??
-    (task.end_time
-      ? Math.round((new Date(task.end_time).getTime() - new Date(task.start_time).getTime()) / 1000)
-      : task.is_running
-        ? elapsedSeconds(task.start_time)
-        : null);
+  const phase = getTaskPhase(task, now);
+  const duration = taskSeconds(task, now) || null;
 
   async function markDone() {
     if (task.is_running) {
@@ -84,11 +81,11 @@ export function TaskItem({ task }: { task: Task }) {
   }
 
   const statusIcon =
-    task.status === "done" ? (
+    phase === "done" ? (
       <CheckCircle2 className="size-4 text-emerald-500" />
-    ) : task.status === "skipped" ? (
+    ) : phase === "skipped" ? (
       <XCircle className="size-4 text-muted-foreground" />
-    ) : task.is_running ? (
+    ) : phase === "in_progress" ? (
       <span className="relative flex size-4 items-center justify-center">
         <span className="absolute inline-flex size-2.5 animate-ping rounded-full bg-emerald-500 opacity-75" />
         <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
@@ -96,6 +93,9 @@ export function TaskItem({ task }: { task: Task }) {
     ) : (
       <Circle className="size-4 text-muted-foreground" />
     );
+
+  const phaseLabel =
+    phase === "not_started" ? "Not started" : phase === "in_progress" ? "In progress" : null;
 
   return (
     <div className="relative overflow-hidden rounded-xl">
@@ -152,6 +152,11 @@ export function TaskItem({ task }: { task: Task }) {
               <span className="inline-flex items-center gap-1">
                 <span className="size-1.5 rounded-full" style={{ backgroundColor: category.color }} />
                 {category.name}
+              </span>
+            )}
+            {phaseLabel && (
+              <span className={cn(phase === "in_progress" && "font-medium text-emerald-600 dark:text-emerald-500")}>
+                · {phaseLabel}
               </span>
             )}
           </div>

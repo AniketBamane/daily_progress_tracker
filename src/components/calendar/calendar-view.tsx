@@ -7,7 +7,9 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { Badge } from "@/components/ui/badge";
 import { createClient } from "@/lib/supabase/client";
 import { useCategoriesContext } from "@/contexts/categories-context";
-import { dayKey, formatClockTime, formatDuration, elapsedSeconds } from "@/lib/utils/time";
+import { useNow } from "@/hooks/use-now";
+import { dayKey, formatClockTime, formatDuration } from "@/lib/utils/time";
+import { taskSeconds } from "@/lib/utils/analytics";
 import type { Task } from "@/types/database";
 import { cn } from "@/lib/utils";
 
@@ -20,15 +22,6 @@ function startOfWeek(offset: number) {
   return monday;
 }
 
-function taskDuration(task: Task) {
-  if (task.duration_seconds) return task.duration_seconds;
-  if (task.is_running) return elapsedSeconds(task.start_time);
-  if (task.end_time) {
-    return (new Date(task.end_time).getTime() - new Date(task.start_time).getTime()) / 1000;
-  }
-  return 0;
-}
-
 export function CalendarView({ userId }: { userId: string }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [tasks, setTasks] = useState<Task[]>([]);
@@ -36,6 +29,7 @@ export function CalendarView({ userId }: { userId: string }) {
   const [selectedDay, setSelectedDay] = useState<string | null>(null);
   const [supabase] = useState(() => createClient());
   const { categories } = useCategoriesContext();
+  const now = useNow();
 
   const weekStart = useMemo(() => startOfWeek(weekOffset), [weekOffset]);
   const weekEnd = useMemo(() => {
@@ -73,10 +67,10 @@ export function CalendarView({ userId }: { userId: string }) {
       date.setDate(date.getDate() + i);
       const key = dayKey(date);
       const dayTasks = tasks.filter((t) => dayKey(t.start_time) === key);
-      const totalSeconds = dayTasks.reduce((sum, t) => sum + taskDuration(t), 0);
+      const totalSeconds = dayTasks.reduce((sum, t) => sum + taskSeconds(t, now), 0);
       return { date, key, tasks: dayTasks, totalSeconds };
     });
-  }, [weekStart, tasks]);
+  }, [weekStart, tasks, now]);
 
   const weekTotal = days.reduce((sum, d) => sum + d.totalSeconds, 0);
   const todayKey = dayKey(new Date());
@@ -192,7 +186,7 @@ export function CalendarView({ userId }: { userId: string }) {
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-sm font-medium">{task.name}</p>
                     <p className="text-xs text-muted-foreground">
-                      {formatClockTime(task.start_time)} · {formatDuration(taskDuration(task))}
+                      {formatClockTime(task.start_time)} · {formatDuration(taskSeconds(task, now))}
                       {category ? ` · ${category.name}` : ""}
                     </p>
                   </div>

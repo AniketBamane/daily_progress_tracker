@@ -1,22 +1,52 @@
 import type { Category, Task } from "@/types/database";
 import { dayKey, elapsedSeconds } from "@/lib/utils/time";
 
-/** Effective duration of a task in seconds, whether finished, running, or just logged. */
-export function taskSeconds(task: Task): number {
-  if (task.duration_seconds) return task.duration_seconds;
-  if (task.end_time) {
-    return Math.max(0, (new Date(task.end_time).getTime() - new Date(task.start_time).getTime()) / 1000);
-  }
+export type TaskPhase = "not_started" | "in_progress" | "done" | "skipped";
+
+/**
+ * Where a task stands right now, independent of its stored `status` field
+ * for the time-based cases: a scheduled task whose window hasn't arrived yet
+ * reads as "not started", one whose window has started (or a live timer)
+ * reads as "in progress", and only an explicit done/skip ever changes that.
+ */
+export function getTaskPhase(task: Task, now: Date = new Date()): TaskPhase {
+  if (task.status === "done") return "done";
+  if (task.status === "skipped") return "skipped";
+  if (task.is_running) return "in_progress";
+  return now < new Date(task.start_time) ? "not_started" : "in_progress";
+}
+
+/**
+ * Effective tracked seconds for a task *as of `now`* — a scheduled task that
+ * hasn't started yet contributes 0, one that's currently underway
+ * contributes only the time elapsed so far (not its full planned duration),
+ * and a finished/done/skipped task contributes its full logged duration.
+ */
+export function taskSeconds(task: Task, now: Date = new Date()): number {
   if (task.is_running) return elapsedSeconds(task.start_time);
+
+  const start = new Date(task.start_time);
+  const stillPending = task.status !== "done" && task.status !== "skipped";
+
+  if (stillPending && now < start) return 0; // scheduled, hasn't started yet
+
+  const end = task.end_time ? new Date(task.end_time) : null;
+  if (stillPending && end && now < end) {
+    // Underway right now — only count what's actually elapsed so far.
+    return Math.max(0, (now.getTime() - start.getTime()) / 1000);
+  }
+
+  if (task.duration_seconds != null) return task.duration_seconds;
+  if (end) return Math.max(0, (end.getTime() - start.getTime()) / 1000);
   return 0;
 }
 
 /** Total tracked seconds per calendar day (local time), keyed by "YYYY-MM-DD". */
-export function buildDailyTotals(tasks: Task[]): Map<string, number> {
+export function buildDailyTotals(tasks: Task[], now: Date = new Date()): Map<string, number> {
   const map = new Map<string, number>();
   for (const task of tasks) {
     const key = dayKey(task.start_time);
-    map.set(key, (map.get(key) ?? 0) + taskSeconds(task));
+    map.set(key, (map.get(key) ?? 0) + taskSeconds(task, now));
   }
   return map;
 }
@@ -29,11 +59,15 @@ export interface CategoryTotal {
 }
 
 /** Total tracked seconds per category, sorted descending, uncategorized last. */
-export function buildCategoryTotals(tasks: Task[], categories: Category[]): CategoryTotal[] {
+export function buildCategoryTotals(
+  tasks: Task[],
+  categories: Category[],
+  now: Date = new Date()
+): CategoryTotal[] {
   const totals = new Map<string, number>();
   for (const task of tasks) {
     const key = task.category_id ?? "uncategorized";
-    totals.set(key, (totals.get(key) ?? 0) + taskSeconds(task));
+    totals.set(key, (totals.get(key) ?? 0) + taskSeconds(task, now));
   }
 
   const rows: CategoryTotal[] = categories
@@ -51,7 +85,10 @@ export function buildCategoryTotals(tasks: Task[], categories: Category[]): Cate
 const WEEKDAY_LABELS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 /** Average tracked seconds per weekday across all weeks present in the data. */
-export function weekdayAverages(tasks: Task[]): { weekday: string; avgSeconds: number }[] {
+export function weekdayAverages(
+  tasks: Task[],
+  now: Date = new Date()
+): { weekday: string; avgSeconds: number }[] {
   const totals = new Array(7).fill(0);
   const daysSeen = new Array(7).fill(0) as number[];
   const seenDates = new Set<string>();
@@ -63,7 +100,7 @@ export function weekdayAverages(tasks: Task[]): { weekday: string; avgSeconds: n
       seenDates.add(key);
       daysSeen[date.getDay()]++;
     }
-    totals[date.getDay()] += taskSeconds(task);
+    totals[date.getDay()] += taskSeconds(task, now);
   }
 
   return WEEKDAY_LABELS.map((label, i) => ({

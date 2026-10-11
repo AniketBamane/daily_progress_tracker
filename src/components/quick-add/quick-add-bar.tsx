@@ -82,7 +82,11 @@ export function QuickAddBar({ className, autoFocus, onAdded }: QuickAddBarProps)
         end_time: result.endTime ? result.endTime.toISOString() : null,
         duration_seconds: result.durationSeconds,
         priority: result.priority,
-        status: result.endTime ? "done" : "in_progress",
+        // Never auto-complete a task just because a time range was typed —
+        // "done" only happens when the user explicitly marks it so. Whether
+        // it shows as "not started" / "in progress" is derived live from the
+        // current time vs. start/end (see getTaskPhase).
+        status: "in_progress",
         is_running: !result.hasExplicitTime,
       });
 

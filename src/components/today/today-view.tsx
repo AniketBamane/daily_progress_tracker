@@ -6,27 +6,25 @@ import { KpiCard } from "@/components/kpi-card";
 import { QuickAddBar } from "@/components/quick-add/quick-add-bar";
 import { TaskList } from "@/components/tasks/task-list";
 import { useTasksContext } from "@/contexts/tasks-context";
-import { elapsedSeconds, formatDuration } from "@/lib/utils/time";
+import { useNow } from "@/hooks/use-now";
+import { formatDuration } from "@/lib/utils/time";
+import { taskSeconds } from "@/lib/utils/analytics";
 
 export function TodayView({ streak }: { streak: number }) {
   const { tasks } = useTasksContext();
+  const now = useNow();
 
   const stats = useMemo(() => {
-    const totalSeconds = tasks.reduce((sum, t) => {
-      if (t.duration_seconds) return sum + t.duration_seconds;
-      if (t.is_running) return sum + elapsedSeconds(t.start_time);
-      if (t.end_time) {
-        return sum + (new Date(t.end_time).getTime() - new Date(t.start_time).getTime()) / 1000;
-      }
-      return sum;
-    }, 0);
+    // Only counts time that has actually elapsed — a task scheduled later
+    // today contributes 0 until its window arrives.
+    const totalSeconds = tasks.reduce((sum, t) => sum + taskSeconds(t, now), 0);
 
     const done = tasks.filter((t) => t.status === "done").length;
     const total = tasks.length;
     const completionRate = total > 0 ? Math.round((done / total) * 100) : 0;
 
     return { totalSeconds, done, total, completionRate };
-  }, [tasks]);
+  }, [tasks, now]);
 
   const today = new Date().toLocaleDateString("en-US", {
     weekday: "long",
