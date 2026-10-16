@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, useMotionValue, useTransform, animate, type PanInfo } from "framer-motion";
-import { Check, Trash2, Circle, CheckCircle2, XCircle, MoreVertical } from "lucide-react";
+import { Check, Trash2, Circle, CheckCircle2, XCircle, MoreVertical, Repeat } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -56,6 +56,7 @@ export function TaskItem({ task }: { task: Task }) {
             await createClient().from("tasks").insert({
               user_id: removed.user_id,
               category_id: removed.category_id,
+              routine_id: removed.routine_id,
               name: removed.name,
               notes: removed.notes,
               start_time: removed.start_time,
@@ -152,6 +153,11 @@ export function TaskItem({ task }: { task: Task }) {
           </div>
           <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs text-muted-foreground">
             <span>{formatClockTime(task.start_time)}</span>
+            {task.routine_id && (
+              <span className="inline-flex items-center" title="From your routine" aria-label="From your routine">
+                <Repeat className="size-3" />
+              </span>
+            )}
             {duration !== null && <span>· {formatDuration(duration)}</span>}
             {category && (
               <span className="inline-flex items-center gap-1">

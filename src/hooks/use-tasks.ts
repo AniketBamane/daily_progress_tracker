@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { dayKey } from "@/lib/utils/time";
 import type { Task } from "@/types/database";
 
 export interface NewTaskInput {
@@ -14,6 +15,21 @@ export interface NewTaskInput {
   status?: Task["status"];
   priority?: Task["priority"];
   is_running?: boolean;
+}
+
+async function createRoutineTasksForToday(
+  supabase: ReturnType<typeof createClient>
+): Promise<Task[]> {
+  const now = new Date();
+  const dayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const { data, error } = await supabase.rpc("apply_routines", {
+    p_day: dayKey(dayStart),
+    p_day_start: dayStart.toISOString(),
+  });
+  // Routines are a convenience — never break the Today view if this fails
+  // (e.g. the routine tables haven't been migrated yet).
+  if (error || !data) return [];
+  return data;
 }
 
 /**
@@ -57,6 +73,28 @@ export function useTasks(initialTasks: Task[], userId: string) {
     };
   }, [supabase, userId]);
 
+  const mergeTasks = useCallback((rows: Task[]) => {
+    if (rows.length === 0) return;
+    setTasks((prev) => {
+      const ids = new Set(prev.map((t) => t.id));
+      return [...rows.filter((t) => !ids.has(t.id)), ...prev];
+    });
+  }, []);
+
+  /**
+   * Adds today's routine tasks that haven't been added yet. Safe to call any
+   * number of times — the database creates each routine task at most once a day.
+   */
+  const applyRoutines = useCallback(async () => {
+    const rows = await createRoutineTasksForToday(supabase);
+    mergeTasks(rows);
+    return rows;
+  }, [supabase, mergeTasks]);
+
+  useEffect(() => {
+    createRoutineTasksForToday(supabase).then(mergeTasks);
+  }, [supabase, mergeTasks]);
+
   const addTask = useCallback(
     async (input: NewTaskInput) => {
       const optimisticId = `optimistic-${crypto.randomUUID()}`;
@@ -65,6 +103,7 @@ export function useTasks(initialTasks: Task[], userId: string) {
         id: optimisticId,
         user_id: userId,
         category_id: input.category_id ?? null,
+        routine_id: null,
         name: input.name,
         notes: input.notes ?? null,
         start_time: input.start_time ?? nowIso,
@@ -147,5 +186,5 @@ export function useTasks(initialTasks: Task[], userId: string) {
     [tasks, updateTask]
   );
 
-  return { tasks, setTasks, addTask, updateTask, deleteTask, stopRunningTask };
+  return { tasks, setTasks, addTask, updateTask, deleteTask, stopRunningTask, applyRoutines };
 }

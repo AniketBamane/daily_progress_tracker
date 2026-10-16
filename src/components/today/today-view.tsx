@@ -1,7 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { CheckCircle2, Clock, Flame, ListTodo } from "lucide-react";
+import Link from "next/link";
+import { CheckCircle2, Clock, Flame, ListTodo, Repeat } from "lucide-react";
 import { KpiCard } from "@/components/kpi-card";
 import { QuickAddBar } from "@/components/quick-add/quick-add-bar";
 import { TaskList } from "@/components/tasks/task-list";
@@ -68,7 +69,16 @@ export function TodayView({ streak }: { streak: number }) {
       </div>
 
       <div>
-        <h2 className="mb-3 text-sm font-medium text-muted-foreground">Timeline</h2>
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h2 className="text-sm font-medium text-muted-foreground">Timeline</h2>
+          <Link
+            href="/routine"
+            className="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-xs font-medium text-muted-foreground transition hover:bg-muted hover:text-foreground"
+          >
+            <Repeat className="size-3.5" />
+            Routine
+          </Link>
+        </div>
         <TaskList tasks={tasks} />
       </div>
     </div>

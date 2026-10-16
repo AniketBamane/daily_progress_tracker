@@ -118,9 +118,12 @@ export function AppShell({
           <Plus className="size-6" />
         </button>
 
-        {NAV_ITEMS.slice(2).map((item) => (
-          <MobileNavLink key={item.href} item={item} active={pathname === item.href} />
-        ))}
+        {/* Settings stays reachable from the avatar menu in the mobile header. */}
+        {NAV_ITEMS.slice(2)
+          .filter((item) => item.href !== "/settings")
+          .map((item) => (
+            <MobileNavLink key={item.href} item={item} active={pathname === item.href} />
+          ))}
       </nav>
 
       <Sheet open={quickAddOpen} onOpenChange={setQuickAddOpen}>

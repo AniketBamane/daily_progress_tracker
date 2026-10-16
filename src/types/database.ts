@@ -44,6 +44,7 @@ export interface Database {
           id: string;
           user_id: string;
           category_id: string | null;
+          routine_id: string | null;
           name: string;
           notes: string | null;
           start_time: string;
@@ -79,9 +80,46 @@ export interface Database {
         Update: Partial<Database["public"]["Tables"]["goals"]["Row"]>;
         Relationships: [];
       };
+      routine_items: {
+        Row: {
+          id: string;
+          user_id: string;
+          category_id: string | null;
+          name: string;
+          start_minute: number;
+          duration_minutes: number;
+          days_of_week: number[];
+          priority: TaskPriority;
+          is_active: boolean;
+          created_at: string;
+        };
+        Insert: Partial<Database["public"]["Tables"]["routine_items"]["Row"]> & {
+          user_id: string;
+          name: string;
+          start_minute: number;
+          duration_minutes: number;
+        };
+        Update: Partial<Database["public"]["Tables"]["routine_items"]["Row"]>;
+        Relationships: [];
+      };
+      routine_runs: {
+        Row: {
+          routine_id: string;
+          user_id: string;
+          run_date: string;
+        };
+        Insert: Database["public"]["Tables"]["routine_runs"]["Row"];
+        Update: Partial<Database["public"]["Tables"]["routine_runs"]["Row"]>;
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      apply_routines: {
+        Args: { p_day: string; p_day_start: string };
+        Returns: Database["public"]["Tables"]["tasks"]["Row"][];
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
@@ -91,5 +129,6 @@ export type Task = Database["public"]["Tables"]["tasks"]["Row"];
 export type Category = Database["public"]["Tables"]["categories"]["Row"];
 export type Goal = Database["public"]["Tables"]["goals"]["Row"];
 export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
+export type RoutineItem = Database["public"]["Tables"]["routine_items"]["Row"];
 
 export type TaskWithCategory = Task & { category: Category | null };
